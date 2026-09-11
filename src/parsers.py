@@ -276,6 +276,7 @@ def parse_counts(count_file):
     - Preserves all sample columns dynamically.
     - Handles 'NA' by converting to 0.
     - Returns a dense matrix ready for groupby operations.
+    - Preserves float data for handling EM-quantifiers
     """
     try:
         # 1. Sniff the delimiter 
@@ -305,19 +306,29 @@ def parse_counts(count_file):
         df.rename(columns={df.columns[0]: 'isoform'}, inplace=True)
         
         if df.shape[1] < 2:
-             qc_logger.error(f"Error: File {count_file} has no sample columns.", file=sys.stderr)
+             qc_logger.error(f"Error: File {count_file} has no sample columns.")
              sys.exit(1)
 
-        # 4. Handle NAs and dtypes
-        # Fills NA with 0 and ensures counts are integers (common requirement for counts)
+        # 4. Handle NAs and validate dtypes
+        # Counts are kept as provided. EM-based quantifiers (bambu, salmon,
+        # kallisto, RSEM) report fractional abundances; truncating them biases
+        # expression downward and collapses low-expression transcripts to zero.
+
         sample_cols = df.columns[1:]
-        df[sample_cols] = df[sample_cols].fillna(0).astype(int)
+
+        non_numeric = [c for c in sample_cols
+                       if not pd.api.types.is_numeric_dtype(df[c])]
+        if non_numeric:
+            qc_logger.error(f"Non-numeric count columns in {count_file}: {non_numeric}")
+            sys.exit(1)
+
+        df[sample_cols] = df[sample_cols].fillna(0)
+
+        if (df[sample_cols] % 1 != 0).any().any():
+            qc_logger.info("Fractional FL counts detected due to EM-based quantifier; values preserved as provided.")
+
 
         return df
-
-    except Exception as e:
-        qc_logger.error(f"Error parsing count file {count_file}: {e}", file=sys.stderr)
-        sys.exit(1)
 
 def parse_td2_to_dict(td2_faa):
     """

@@ -16,6 +16,7 @@ Each percentage in the summary table is computed over the denominator given in i
 import pandas as pd
 
 from src.utilities.rescue.rescue_by_mapping import merge_classifications, add_filter_results
+from src.utilities.rescue.evidence_check import EVIDENCE_COLUMN, rows_for_requant
 
 SUMMARY_COLUMNS = ["section", "group", "category", "count", "total", "percent"]
 
@@ -31,6 +32,7 @@ EXCLUSION_REASONS = [
     "mapping_not_run",                # ISM/NIC/NNC artifacts in automatic mode
     "no_mapping_hit",                 # candidate without any alignment to the targets
     "no_hit_passes_filter",           # all the targets it maps to fail the filter
+    "failed_evidence_check",          # its reference targets fail the count requisites
 ]
 
 
@@ -108,7 +110,12 @@ def artifact_outcomes(classif_df, rescue_df, mode, rescue_mono_exonic="all",
     artifacts = artifacts.rename(columns={"isoform": "artifact"}).reset_index(drop=True)
     artifacts["exon_class"] = artifacts["exons"].map(_exon_class)
 
-    # Rescued artifacts: one rescue mode and origin per artifact (ties share the origin)
+    # Rescued artifacts: one rescue mode and origin per artifact (ties share the origin).
+    # Rows of reference targets that failed the evidence check are kept for traceability only.
+    failed_check = set()
+    if EVIDENCE_COLUMN in rescue_df.columns:
+        failed_check = set(rescue_df.loc[rescue_df[EVIDENCE_COLUMN] == "failed", "artifact"])
+    rescue_df = rows_for_requant(rescue_df)
     rescued = rescue_df.drop_duplicates("artifact")[["artifact", "rescue_mode", "origin"]]
     out = artifacts.merge(rescued, on="artifact", how="left")
 
@@ -122,6 +129,8 @@ def artifact_outcomes(classif_df, rescue_df, mode, rescue_mono_exonic="all",
     def outcome(r):
         if pd.notna(r["origin"]):
             return "rescued_reference" if r["origin"] == "reference" else "rescued_lr_defined"
+        if r["artifact"] in failed_check:
+            return "failed_evidence_check"
         mono = r["exons"] == 1
         if r["structural_category"] == FSM:
             # Automatic rescue only reintroduces references with no FSM passing the filter
@@ -215,6 +224,24 @@ def summarize_rescue(classif_df, rescue_df, inclusion_list, mode, strategy=None,
     outcomes = artifact_outcomes(classif_df, rescue_df, mode, rescue_mono_exonic,
                                  candidates, hits)
     rows = []
+
+    # Evidence check of reference targets: failed rows are kept in the table for
+    # traceability, the rest of the summary only uses effective assignments
+    if EVIDENCE_COLUMN in rescue_df.columns:
+        ref_rows = rescue_df[rescue_df["origin"] == "reference"]
+        status = ref_rows.drop_duplicates("assigned_transcript")[EVIDENCE_COLUMN]
+        n_targets = len(status)
+        for st in ["pass", "failed"]:
+            rows.append(_row("evidence_check", "reference_targets", st, (status == st).sum(), n_targets))
+        failed_artifacts = set(rescue_df.loc[rescue_df[EVIDENCE_COLUMN] == "failed", "artifact"])
+        reassigned = set(rescue_df.loc[rescue_df[EVIDENCE_COLUMN] == "reassigned", "artifact"])
+        kept = set(rescue_df.loc[rescue_df[EVIDENCE_COLUMN] == "pass", "artifact"])
+        orphans = failed_artifacts - kept
+        rows += [_row("evidence_check", "artifacts_of_failed_targets", "reassigned_to_lr_defined",
+                      len(orphans & reassigned), len(orphans)),
+                 _row("evidence_check", "artifacts_of_failed_targets", "sent_to_gene_residual",
+                      len(orphans - reassigned), len(orphans))]
+        rescue_df = rows_for_requant(rescue_df)
     n_artifacts = len(outcomes)
     rescued = outcomes[outcomes["outcome"].isin(RESCUED_OUTCOMES)]
     assigned = rescue_df.drop_duplicates("assigned_transcript")

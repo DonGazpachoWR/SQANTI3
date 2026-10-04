@@ -118,8 +118,10 @@ outcome.labels <- c(rescued_reference = "Rescued: reference",
                     category_not_eligible = "Category not eligible",
                     mapping_not_run = "Mapping not run (automatic mode)",
                     no_mapping_hit = "No mapping hit",
-                    no_hit_passes_filter = "No target passes the filter")
-outcome.palette <- setNames(c("#2a78d6", "#eb6834", "#1baf7a", "#eda100",
+                    no_hit_passes_filter = "No target passes the filter",
+                    failed_evidence_check = "Targets fail the evidence check")
+# Categorical slots in fixed order; the structural exclusion is a neutral grey
+outcome.palette <- setNames(c("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#9e9e9e",
                               "#e87ba4", "#008300", "#4a3aa7", "#e34948"),
                             unname(outcome.labels))
 origin.palette <- c(reference = "#2a78d6", lr_defined = "#eb6834")
@@ -268,6 +270,19 @@ if (nrow(ao) > 0) {
     theme(axis.text.x = element_text(angle = 35, hjust = 1, size = 9),
           axis.line = element_blank())
   print(p)
+}
+
+#### Evidence check of reference targets ####
+ev <- section("evidence_check")
+if (nrow(ev) > 0) {
+  ev_names <- c(pass = "Reference targets passing the count requisites",
+                failed = "Reference targets failing them (not reintroduced)",
+                reassigned_to_lr_defined = "Their artifacts reassigned to a long-read isoform",
+                sent_to_gene_residual = "Their artifacts sent to the gene residual")
+  etab <- data.frame(Measure = unname(ev_names[ev$category]), Count = ev$count,
+                     Percent = pct(ev$percent))
+  table_page("Evidence check of reference targets", etab,
+             "Count requisites of the rules applied to the counts aggregated from the artifacts.")
 }
 
 #### Page 7: gene-level recovery ####

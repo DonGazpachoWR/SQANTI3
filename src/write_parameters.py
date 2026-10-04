@@ -96,6 +96,7 @@ def write_rescue_parameters(args):
         f.write("Mode\t" + str(args.mode) + "\n")
         f.write("Requant\t" + str(args.requant) + "\n")
         f.write("Strategy\t" + str(args.strategy) + "\n")
+        f.write("SkipReport\t" + str(args.skip_report) + "\n")
         f.write("OutputPrefix\t" + str(args.output) + "\n")
         f.write("OutputDirectory\t" + os.path.abspath(args.dir) + "\n")
         f.write("CPUs\t" + str(args.cpus) + "\n")

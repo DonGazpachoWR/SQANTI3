@@ -84,6 +84,9 @@ def rescue_argparse():
                       default = "sqanti3_output",
                       help = "Directory for output files. Default: Directory where the script was run.", 
                       required = False)
+  co.add_argument("--skip_report",
+                      action = "store_true",
+                      help = "Do not generate the PDF report of the rescue. The summary tables are written anyway.")
   # Performance options
   cp = parser.add_argument_group("Extra options")
   cp.add_argument("-c", "--cpus",

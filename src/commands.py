@@ -46,6 +46,7 @@ RSCRIPT_TUSCO_REPORT = os.path.join(utilitiesPath,"report_qc","TUSCO_report.R")
 
 # Rscript filter
 RSCRIPT_FILTER_REPORT = os.path.join(utilitiesPath,"report_filter","SQANTI3_filter_report.R")
+RSCRIPT_RESCUE_REPORT = os.path.join(utilitiesPath,"report_rescue","SQANTI3_rescue_report.R")
 RSCRIPT_ML = os.path.join(utilitiesPath,"filter","SQANTI3_MLfilter.R")
 
 #Rscript rescue

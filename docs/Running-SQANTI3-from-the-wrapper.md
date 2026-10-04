@@ -152,6 +152,7 @@ rescue:
     json_filter: <path_to>/SQANTI3/src/utilities/filter/filter_default.json
     random_forest: sqanti3_results/isoformsrandomforest.RData
     threshold: 0.7
+    skip_report: false
 
 ```
 </details><br>

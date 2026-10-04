@@ -22,7 +22,7 @@ from src.rescue_steps import (
   run_automatic_rescue,
   rescue_candidates, rescue_targets,
   run_candidate_mapping, run_rules_rescue, run_ML_rescue,
-  save_rescue_results
+  save_rescue_results, run_rescue_report
 )
 from src.utilities.rescue.candidate_mapping_helpers import prepare_fasta_transcriptome
 from src.utilities.rescue.rescue_helpers import read_classification
@@ -54,6 +54,7 @@ def main():
   ref_trans_fasta = prepare_fasta_transcriptome(args.refGTF,args.refFasta,args.dir)
 
   ### RUN FULL RESCUE (IF REQUESTED) ###
+  candidates, hits_df = None, None
   if args.mode == "full":
     candidates = rescue_candidates(class_df,args.rescue_mono_exonic,
                                    prefix)
@@ -105,6 +106,9 @@ def main():
     rescue_class = save_rescue_results(args.dir, args.output, inclusion_list, rescue_df,
                                        args.refGTF, args.filtered_isoforms_gtf,args.corrected_isoforms_fasta,
                                        class_df,args.refClassif)
+
+  #### SUMMARY AND REPORT ####
+  run_rescue_report(class_df, rescue_df, inclusion_list, args, candidates, hits_df)
 
   ## END ##
  

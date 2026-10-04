@@ -102,6 +102,7 @@ def write_rescue_parameters(args):
         f.write("MinExpression\t" + str(args.min_expression) + "\n")
         f.write("SkipEvidenceCheck\t" + str(args.skip_evidence_check) + "\n")
         f.write("MapAutomaticFSM\t" + str(args.map_automatic_fsm) + "\n")
+        f.write("SkipReport\t" + str(args.skip_report) + "\n")
         f.write("OutputPrefix\t" + str(args.output) + "\n")
         f.write("OutputDirectory\t" + os.path.abspath(args.dir) + "\n")
         f.write("CPUs\t" + str(args.cpus) + "\n")

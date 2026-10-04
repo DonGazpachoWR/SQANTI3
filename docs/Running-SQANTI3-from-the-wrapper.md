@@ -157,6 +157,7 @@ rescue:
     skip_evidence_check: false
     random_forest: sqanti3_results/isoformsrandomforest.RData
     threshold: 0.7
+    skip_report: false
 
 ```
 </details><br>

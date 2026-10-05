@@ -47,8 +47,12 @@ def rescue_argparse():
                   help = "If 'automatic' (default), only automatic rescue of FSM artifacts will be performed.\
                      \nIf 'full', rescue will include mapping of ISM, NNC and NIC artifacts to find potential replacement isoforms.")
   cc.add_argument("-q","--requant",
-                  action="store_true",
-                  help = "Run requantification of the rescued isoforms.")
+                  action = argparse.BooleanOptionalAction,
+                  default = True,
+                  help = "Run requantification of the rescued isoforms, redistributing counts \
+                    \nfrom discarded artifacts to their replacement transcripts. \
+                    \nRequires --counts. Use --no-requant to skip it. \
+                    \nDefault: %(default)s")
   cc.add_argument("-s","--strategy", 
                   choices = ["rules", "ml"],
                   default = "rules", 
@@ -80,6 +84,9 @@ def rescue_argparse():
                       default = "sqanti3_output",
                       help = "Directory for output files. Default: Directory where the script was run.", 
                       required = False)
+  co.add_argument("--skip_report",
+                      action = "store_true",
+                      help = "Do not generate the PDF report of the rescue. The summary tables are written anyway.")
   # Performance options
   cp = parser.add_argument_group("Extra options")
   cp.add_argument("-c", "--cpus",

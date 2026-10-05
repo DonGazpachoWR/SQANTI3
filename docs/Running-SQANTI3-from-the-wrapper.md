@@ -147,11 +147,12 @@ rescue:
     counts: ''
     rescue_mono_exonic: all
     mode: automatic
-    requant: false
+    requant: true
     strategy: rules
     json_filter: <path_to>/SQANTI3/src/utilities/filter/filter_default.json
     random_forest: sqanti3_results/isoformsrandomforest.RData
     threshold: 0.7
+    skip_report: false
 
 ```
 </details><br>

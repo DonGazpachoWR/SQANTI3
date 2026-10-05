@@ -5,7 +5,8 @@ import pandas as pd
 from src.wrapper_utils import sqanti_path
 from src.module_logging import rescue_logger, message
 from src.commands import (
-    RSCRIPTPATH, run_command, PYTHONPATH, RESCUE_RANDOM_FOREST
+    RSCRIPTPATH, run_command, PYTHONPATH, RESCUE_RANDOM_FOREST,
+    RSCRIPT_RESCUE_REPORT
 )
 from src.utilities.rescue.automatic_rescue import (
     get_lost_reference_id, rescue_lost_reference, generate_automatic_table
@@ -20,6 +21,10 @@ from src.utilities.rescue.candidate_mapping_helpers import (
 )
 
 from src.utilities.rescue.rescue_by_mapping import rescue_by_mapping
+
+from src.utilities.rescue.rescue_summary import (
+    hit_targets_table, summarize_rescue, write_rescue_summary
+)
 
 from src.rescue_output import (
     write_rescue_gtf, write_rescue_fasta
@@ -257,3 +262,34 @@ def save_rescue_results(out_dir,out_prefix, rescued_transcripts, rescue_df, refG
     rescued_class.to_csv(f"{prefix}_rescued_classification.txt", sep="\t", index=False)
     rescue_logger.info(f"Rescued classification written to file: {prefix}_rescued_classification.txt")
     return rescued_class
+
+def run_rescue_report(class_df, rescue_df, inclusion_list, args, candidates=None, hits_df=None):
+    """Write the rescue summary tables and, unless --skip_report, the PDF report."""
+    message("Summarizing rescue results", rescue_logger)
+    prefix = f"{args.dir}/{args.output}"
+    hits, ref_genes = None, None
+    if args.mode == "full" and hits_df is not None:
+        if args.strategy == "rules":
+            ref_dir = f"{args.dir}/reference_rules_filter"
+            hits = hit_targets_table(hits_df, class_df,
+                                     f"{ref_dir}/reference_RulesFilter_classification.txt",
+                                     "rules", reasons_file=f"{ref_dir}/reference_filtering_reasons.txt")
+        else:
+            hits = hit_targets_table(hits_df, class_df, f"{prefix}_reference_isoform_predict.tsv",
+                                     "ml", args.threshold)
+        ref_class = read_classification(args.refClassif)
+        ref_genes = dict(zip(ref_class["isoform"], ref_class["associated_gene"]))
+    thr = args.threshold if args.strategy == "ml" else None
+    summary, outcomes = summarize_rescue(class_df, rescue_df, inclusion_list, args.mode,
+                                         args.strategy, args.rescue_mono_exonic,
+                                         candidates, hits, ref_genes, thr)
+    files = write_rescue_summary(prefix, summary, outcomes, hits, args.mode, args.strategy, thr)
+    rescue_logger.info(f"Rescue summary written to file: {files['summary']}")
+
+    if args.skip_report:
+        return files
+    report_cmd = f"{RSCRIPTPATH} {RSCRIPT_RESCUE_REPORT} -d {args.dir} -o {args.output}"
+    logFile = f"{args.dir}/logs/rescue_report.log"
+    run_command(report_cmd, rescue_logger, logFile, description="Rescue report")
+    rescue_logger.info(f"Rescue report written to file: {prefix}_SQANTI3_rescue_report.pdf")
+    return files

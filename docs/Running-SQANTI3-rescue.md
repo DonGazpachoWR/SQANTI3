@@ -22,6 +22,8 @@
 
     * <a href="#ml_out">Machine learning-specific output
 
+    * <a href="#report">Rescue report and summary tables
+
 ***
 
 <a name="intro"></a>
@@ -35,7 +37,7 @@ As of SQANTI3 v5.1, a new module has been added to the SQANTI3 workflow for tran
 The SQANTI3 rescue algorithm is designed to be run **after transcriptome filtering** and uses the long read-based evidence provided by discarded isoforms (i.e. artifacts) to recover transcripts in the associated reference transcriptome. 
 The idea behind this strategy is to avoid losing transcripts/genes that are detected as expressed by long read sequencing, but whose start/end/junctions could not be confidently validated using orthogonal data, resulting in the removal of those genes/transcripts from the transcriptome. More details about this can be found in the [Motivation](#motivation) section below.
 
-In particular, during the rescue, SQANTI3 will try to confidently assign each discarded artifact to the best matching reference transcript. As a result, SQANTI3 rescue will generate an **expanded transcriptome GTF** including a set of reference transcripts as well as the long read-defined isoforms that passed the filter. Optionally, requantification can be performed to reassign expression values to the rescued isoforms.
+In particular, during the rescue, SQANTI3 will try to confidently assign each discarded artifact to the best matching reference transcript. As a result, SQANTI3 rescue will generate an **expanded transcriptome GTF** including a set of reference transcripts as well as the long read-defined isoforms that passed the filter. Requantification is performed by default to reassign expression values to the rescued isoforms. It requires `--counts` and can be disabled with `--no-requant`.
 
 A new functionality of the rescue module is the requantification of the curated transcriptome. In this final step, the expression values of the transcripts that were not affected by filtering or rescue are kept intact, while the expression values of the rescued transcripts are transferred from their corresponding long read-defined artifact(s). More details about this can be found in the [Requantification]() section below.
 
@@ -174,7 +176,7 @@ All in all, these are the arguments accepted by `sqanti3_rescue.py rules`:
 
 ```bash
 usage: sqanti3_rescue.py [-h] --filter_class FILTER_CLASS -rg REFGTF -rf REFFASTA [--corrected_isoforms_fasta CORRECTED_ISOFORMS_FASTA] [--filtered_isoforms_gtf FILTERED_ISOFORMS_GTF] [-k REFCLASSIF] [--counts COUNTS]
-                         [-e {all,fsm,none}] [--mode {automatic,full}] [-q] [-s {rules,ml}] [-j JSON_FILTER] [-r RANDOM_FOREST] [-t THRESHOLD] [-o OUTPUT] [-d DIR] [-c CPUS] [-v] [-l {ERROR,WARNING,INFO,DEBUG}]
+                         [-e {all,fsm,none}] [--mode {automatic,full}] [-q] [-s {rules,ml}] [-j JSON_FILTER] [-r RANDOM_FOREST] [-t THRESHOLD] [-o OUTPUT] [-d DIR] [--skip_report] [-c CPUS] [-v] [-l {ERROR,WARNING,INFO,DEBUG}]
 
 ```
 
@@ -210,7 +212,9 @@ Customization options:
                         Whether or not to include mono-exonic artifacts in the rescue. Default: all
   --mode {automatic,full}
                         If 'automatic' (default), only automatic rescue of FSM artifacts will be performed. If 'full', rescue will include mapping of ISM, NNC and NIC artifacts to find potential replacement isoforms.
-  -q, --requant         Run requantification of the rescued isoforms.
+  -q, --requant, --no-requant
+                        Run requantification of the rescued isoforms. Requires --counts.
+                        (default: True)
   -s {rules,ml}, --strategy {rules,ml}
                         Filter strategy used. Default: rules
 
@@ -228,6 +232,7 @@ Output options:
   -o OUTPUT, --output OUTPUT
                         Prefix for output files.
   -d DIR, --dir DIR     Directory for output files. Default: Directory where the script was run.
+  --skip_report         Do not generate the PDF report of the rescue. The summary tables are written anyway.
 
 Extra options:
   -c CPUS, --cpus CPUS  Number of CPUs to use. Default: 4
@@ -250,7 +255,7 @@ Regardless of the rescue mode that is selected, SQ3 has the following **common a
 
 - **Reference transcriptome classification file** generated after running SQANTI3 QC on the reference transcriptome, which must be done previously to running the rescue and using the same orthogonal data as for long read-defined transcriptome QC. This file must be supplied via the `--refClassif` (or `-k`) argument and will be used to evaluate reference rescue target support ([see details above](#3-application-of-sq3-filter-to-the-reference-transcriptome)).
 
-- **Counts** file containing expression values of transcript models before SQANTI3 filtering and rescue. This file is required if the `--requant` (`-q`) module is used. It must include two columns: the first for the isoform ID and the second for the corresponding expression value. Column headers can vary. Provide this file using the `--counts` (or `-c`) argument; it will be used to re-evaluate the expression values of the filtered and rescued transcript models.
+- **Counts** file containing expression values of transcript models before SQANTI3 filtering and rescue. This file is required by the requantification module, which is enabled by default. If it is not provided, rescue emits a warning and skips requantification. It must include two columns: the first for the isoform ID and the second for the corresponding expression value. Column headers can vary. Provide this file using the `--counts` (or `-c`) argument; it will be used to re-evaluate the expression values of the filtered and rescued transcript models.
 
 
 Additionally, the following **parameters** can be set to modify the behavior of the rescue algorithm:
@@ -343,9 +348,33 @@ EF011062	0.512
 DQ875385	0.758
 ```
 
+<a name="report"></a>
+
+### Rescue report and summary tables
+
+At the end of every run, rescue writes a summary of its results and, unless `--skip_report` is given, a PDF report named `*_SQANTI3_rescue_report.pdf`. All the numbers in the report are computed in Python and written to tables first, so they can be read by other programs; the R script only draws them.
+
+The report distinguishes three units, since several artifacts can point to the same transcript: **artifacts** (isoforms classified as Artifact by the filter), **assigned transcripts** (the targets that rescued artifacts point to) and **added transcripts** (reference transcripts reintroduced in the transcriptome). Each percentage states its denominator. The report includes:
+
+- Overview of the three units.
+- Rescued artifacts by rescue mode (automatic or mapping) and origin of the target (reference or long read-defined), as a table and a stacked barplot. Some combinations are empty by construction: automatic rescue only reintroduces reference transcripts.
+- Rescued artifacts by the structural category of the artifact. The category of reference targets is not used, since they are FSM of themselves.
+- Transcriptome composition before and after the rescue. Added transcripts are coloured by the category of the artifact that reintroduced them.
+- Outcome of every artifact. Artifacts that are not rescued are split by the reason they were excluded: their reference transcript is already represented, mono-exonic artifacts excluded by `--rescue_mono_exonic`, category not considered by the rescue (genic, antisense, fusion, intergenic and genic intron), mapping not run (automatic mode), no mapping hit, or no target passing the filter. A heatmap of structural category × outcome shows the same information.
+- Gene-level recovery: genes that are left without isoforms by the filter and recover at least one transcript with the rescue. Novel genes are not counted.
+- Multiplicity: how many rescued artifacts point to each assigned transcript.
+- Mono- and multi-exonic artifacts rescued and not rescued.
+- Filter diagnostics on the targets hit by the candidates (`--mode full`): for the rules strategy, the requisites failed by the reference targets that do not pass the rules; for the ML strategy, the distribution of `POS_MLprob` of the reference targets with the threshold.
+
+The tables are:
+
+- `*_rescue_summary.tsv`: long table with columns `section`, `group`, `category`, `count`, `total` and `percent`. `percent` is `count` over `total`. Rows with section `run` record the rescue mode, strategy and ML threshold.
+- `*_rescue_artifact_outcomes.tsv`: one row per artifact with its structural category, mono- or multi-exonic class, outcome, rescue mode and origin of the target.
+- `*_rescue_hit_targets.tsv` (`--mode full`): one row per target hit by a candidate, with its origin and filter result, plus `hit_filter_reason` (rules) or `hit_POS_MLprob` (ML).
+
 ### Requantification output
 
-If the `--requant` (`-q`) flag is used when running SQANTI3 rescue, two additional output files will be generated:
+Unless `--no-requant` is passed, and provided that `--counts` is supplied, two additional output files will be generated:
 
 - `*_requantified_counts.tsv`: a two-column table including the isoform IDs and their corresponding expression values after requantification.
 - `*_requantified_extended.tsv`: an extended version of the previous table, with one extra column per sample with the counts of the isoform before requantification. In this table, the artifact isoforms are included.

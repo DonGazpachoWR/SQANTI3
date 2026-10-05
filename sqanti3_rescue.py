@@ -22,7 +22,7 @@ from src.rescue_steps import (
   run_automatic_rescue,
   rescue_candidates, rescue_targets,
   run_candidate_mapping, run_rules_rescue, run_ML_rescue,
-  save_rescue_results
+  save_rescue_results, run_rescue_report
 )
 from src.utilities.rescue.candidate_mapping_helpers import prepare_fasta_transcriptome
 from src.utilities.rescue.rescue_helpers import read_classification
@@ -54,6 +54,7 @@ def main():
   ref_trans_fasta = prepare_fasta_transcriptome(args.refGTF,args.refFasta,args.dir)
 
   ### RUN FULL RESCUE (IF REQUESTED) ###
+  candidates, hits_df = None, None
   if args.mode == "full":
     candidates = rescue_candidates(class_df,args.rescue_mono_exonic,
                                    prefix)
@@ -97,6 +98,7 @@ def main():
   #### WRITE FINAL OUTPUTS OF RESCUE ####
   # Create new GTF including rescued transcripts #
   if args.filtered_isoforms_gtf is None:
+    rescue_class = None
     rescue_logger.warning("No filtered GTF provided.")
     rescue_logger.warning("Rescue will be performed but no GTF will be generated.")
   else:
@@ -105,12 +107,25 @@ def main():
                                        args.refGTF, args.filtered_isoforms_gtf,args.corrected_isoforms_fasta,
                                        class_df,args.refClassif)
 
-  ## END ##
-  message("Rescue finished successfully!",rescue_logger)
+  #### SUMMARY AND REPORT ####
+  run_rescue_report(class_df, rescue_df, inclusion_list, args, candidates, hits_df)
 
-  if args.requant:  
-    message("Running requantification.",rescue_logger)
-    requantification_pipeline(args.dir, args.output, args.counts, rescue_df, class_df, rescue_class)
+  ## END ##
+ 
+
+  if args.requant:
+    if rescue_class is None:
+      rescue_logger.warning(
+        "Requantification skipped: it requires the rescued classification, which is only "
+        "generated when --filtered_isoforms_gtf is provided."
+      )
+    else:
+      message("Running requantification.", rescue_logger)
+      requantification_pipeline(args.dir, args.output, args.counts, rescue_df, class_df, rescue_class)
+  else:
+    rescue_logger.info("Requantification skipped (--no-requant). The count matrix will not include rescued transcripts.")
+
+  message("Rescue finished successfully!", rescue_logger)
 
 ## Run main()
 if __name__ == "__main__":

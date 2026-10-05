@@ -2,10 +2,11 @@ from collections import defaultdict
 from Bio  import SeqIO
 
 from src.utilities.rt_switching import rts
-from src.parsers import expression_parser, parse_counts
+from src.parsers import expression_parser, parse_counts, read_counts_design, check_counts_design
 from src.utilities.short_reads import kallisto
 from src.utils import pstdev
 from src.module_logging import qc_logger
+from src.config import MIN_EXPRESSION
 
 def process_rts(isoforms_info, outputJuncPath, genome, genome_dict=None,extension="_tmp"):
     """
@@ -65,7 +66,17 @@ def ratio_TSS_dict_reading(isoforms_info,ratio_TSS_dict):
             isoforms_info[iso].ratio_TSS = None
     return isoforms_info
 
-def full_length_quantification(fl_count, isoforms_info):
+def full_length_quantification(fl_count, isoforms_info, counts_design=None,
+                               min_expression=MIN_EXPRESSION):
+    """Assign FL counts to the isoforms.
+
+    In a multi-sample file, a sample expresses an isoform when its count is above 0
+    (min_expression 0, the default) or reaches min_expression; prevalence is the
+    number of such samples.
+    With counts_design (JSON file assigning samples to experimental groups), every
+    isoform also gets the design, which as_dict() uses to report one
+    prevalence_<group> column per group.
+    """
     qc_logger.info("**** Reading Full-length read abundance files.")
 
     # 1. Parse and set the ID as the index for easy lookup
@@ -75,6 +86,12 @@ def full_length_quantification(fl_count, isoforms_info):
     # 3. Get sample names
     fl_samples = df.columns.tolist()
     n = 0
+
+    design = {}
+    if counts_design is not None:
+        design = read_counts_design(counts_design)
+        check_counts_design(design, fl_samples)
+        qc_logger.info("Counts design: " + ", ".join(f"{g} ({len(s)} samples)" for g, s in design.items()))
 
     if len(fl_samples) == 1:
         # --- Single Sample Case ---
@@ -112,6 +129,8 @@ def full_length_quantification(fl_count, isoforms_info):
             else:
                 n += 1
                 obj.FL_dict = defaultdict(int)
+            obj.counts_design = design
+            obj.min_expression = min_expression
 
     if n > 0:
         qc_logger.warning(f"{n} isoforms not found in FL count file. Assigned counts as 0.")

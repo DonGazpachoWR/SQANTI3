@@ -3,6 +3,8 @@ from csv import DictReader, DictWriter, writer
 import os, sys
 import pickle
 
+import pandas as pd
+
 from bx.intervals import Interval
 
 from src.utilities.cupcake.io.GFF import collapseGFFReader, write_collapseGFF_format
@@ -14,6 +16,7 @@ from src.config import utilitiesPath
 from src.helpers import get_isoform_hits_name, get_omitted_name
 from src.module_logging import qc_logger
 from src.utils import find_closest_in_list
+from src.utilities.prevalence_model import model_path, prevalence_model
 
 def write_omitted_isoforms(isoforms_info, outdir,prefix,min_ref_len,is_fusion):
     if min_ref_len > 0 and not is_fusion:
@@ -42,6 +45,32 @@ def write_classification_output(isoforms_info, outputClassPath):
         fout_class.writeheader()
         for iso_key in isoforms_info.keys():
             fout_class.writerow(isoforms_info[iso_key].as_dict())
+
+def write_prevalence_model(isoforms_info, outputClassPath):
+    """Write the prevalence model of a multi-sample --fl_count file.
+
+    Estimates noise_fraction, epsilon and p for the prevalence column and, with
+    --counts_design, for the prevalence_<group> columns (see prevalence_model.py),
+    and writes them to <prefix>_prevalence_model.tsv, next to the classification
+    file. The rules filter uses it for the requisites set to "auto". Nothing is
+    written without per-sample counts.
+    """
+    samples = []
+    for iso in isoforms_info.values():
+        samples.extend(s for s in iso.FL_dict if s not in samples)
+    if len(samples) > 1:
+        first = next(iter(isoforms_info.values()))
+        counts = pd.DataFrame.from_dict(
+            {iso_id: dict(iso.FL_dict) for iso_id, iso in isoforms_info.items()},
+            orient="index").reindex(columns=samples).fillna(0)
+        model = prevalence_model(counts, first.counts_design, first.min_expression)
+        model_file = model_path(outputClassPath)
+        model.to_csv(model_file, sep="\t", index=False)
+        for row in model.itertuples():
+            qc_logger.info(f"Prevalence model of {row.column} ({row.samples} samples, "
+                           f"{row.transcripts} transcripts expressed): epsilon = {row.epsilon:.4g}, "
+                           f"p = {row.p:.4g}, noise fraction = {row.noise_fraction:.4g} ({row.status})")
+        qc_logger.info(f"Prevalence model written to {model_file}")
 
 def write_junction_output(outputJuncPath, RTS_info, fields_junc_cur):
     with open(outputJuncPath, 'w') as h:

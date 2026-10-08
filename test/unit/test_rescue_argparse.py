@@ -55,6 +55,7 @@ def _rescue_namespace(**overrides):
         json_filter="filter.json",
         counts_design=None,
         min_expression=0.0,
+        prevalence_thresholds=None,
         map_automatic_fsm=False,
         random_forest="rf.RData",
         threshold=0.7,

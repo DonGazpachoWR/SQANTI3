@@ -35,10 +35,11 @@ from src.rescue_output import (
 
 from src.parsers import read_counts_design, check_counts_design
 from src.utilities.rescue.evidence_check import (
-    target_count_rules, count_samples, check_design_for_rules,
+    TARGET_CATEGORY, target_count_rules, count_samples, check_design_for_rules,
     write_evidence_rules, apply_evidence_check
 )
 from src.utilities.rescue.sq_requant import load_counts
+from src.utilities.prevalence_model import auto_columns, read_min_prevalence, resolve_auto
 
 def run_automatic_rescue(classif_df,monoexons):
     message("Performing automatic rescue",rescue_logger)
@@ -331,17 +332,33 @@ def run_fallback_mapping(classif_df, rescue_df, ref_trans_fasta, ref_gtf,
 
 
 def run_evidence_check(classif_df, rescue_df, inclusion_list, hits_df, json_filter,
-                       counts_design, counts_file, out_dir, min_expression=MIN_EXPRESSION):
+                       counts_design, counts_file, out_dir, min_expression=MIN_EXPRESSION,
+                       prevalence_thresholds=None):
     """Apply the count requisites of the rules to the rescued reference targets.
 
     The requisites are written to {out_dir}/evidence_check_rules.json and
     evaluated by the rules filter on the counts that requantification would give
     each target from the --counts file, with the expression threshold of QC
-    (min_expression).
+    (min_expression). Prevalence requisites set to "auto" take the minimum
+    prevalence computed by the rules filter (prevalence_thresholds file).
     """
     message("Evidence check of rescued reference transcripts", rescue_logger)
     with open(json_filter) as f:
         rule_sets = target_count_rules(json.load(f))
+    columns = auto_columns({TARGET_CATEGORY: rule_sets})
+    if columns:
+        if prevalence_thresholds is None or not os.path.isfile(prevalence_thresholds):
+            rescue_logger.error(f"The rules set {columns} to \"auto\": the evidence check needs the minimum "
+                                "prevalence computed by the rules filter (<prefix>_prevalence_thresholds.tsv), "
+                                f"but {prevalence_thresholds} was not found. Provide it with --prevalence_thresholds.")
+            sys.exit(1)
+        try:
+            rule_sets = resolve_auto({TARGET_CATEGORY: rule_sets},
+                                     read_min_prevalence(prevalence_thresholds))[TARGET_CATEGORY]
+        except ValueError as e:
+            rescue_logger.error(str(e))
+            sys.exit(1)
+        rescue_logger.info(f"Minimum prevalence of {columns} taken from {prevalence_thresholds}")
     counts_df = load_counts(counts_file, classif_df)
     design = None
     if counts_design is not None:

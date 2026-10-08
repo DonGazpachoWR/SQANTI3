@@ -112,7 +112,7 @@ def main():
       fallback_hits = pd.concat([hits_df, fsm_hits], ignore_index=True)
     inclusion_list, rescue_df = run_evidence_check(class_df, rescue_df, inclusion_list, fallback_hits,
                                                    args.json_filter, args.counts_design, args.counts, args.dir,
-                                                   args.min_expression)
+                                                   args.min_expression, args.prevalence_thresholds)
 
   #### WRITE FINAL OUTPUTS OF RESCUE ####
   # Create new GTF including rescued transcripts #

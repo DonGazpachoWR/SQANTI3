@@ -3,6 +3,7 @@ import subprocess
 
 from src.commands import GFFREAD_PROG
 from src.module_logging import qc_logger, filter_logger, rescue_logger
+from src.utilities.prevalence_model import model_path, thresholds_path
 
 def valid_file(filename,logger):
     if not os.path.isfile(filename):
@@ -220,6 +221,11 @@ def filter_args_validation(args):
     valid_dir(args.dir,filter_logger)
     if args.subcommand == 'rules':
         valid_file(args.json_filter, filter_logger)
+        if not 0 < args.alpha < 1:
+            filter_logger.error(f"--alpha must be between 0 and 1, instead given {args.alpha}.")
+            sys.exit(1)
+        if args.prevalence_model is None:
+            args.prevalence_model = model_path(args.sqanti_class)
     if args.subcommand == 'ml':
         if args.TP is not None:
             valid_file(args.TP, filter_logger)
@@ -267,6 +273,8 @@ def rescue_args_validation(args):
             valid_file(args.random_forest,rescue_logger)
     if args.counts_design is not None:
         valid_file(args.counts_design, rescue_logger)
+    if args.prevalence_thresholds is None:
+        args.prevalence_thresholds = thresholds_path(args.filter_class)
     if args.map_automatic_fsm and args.corrected_isoforms_fasta is None:
         rescue_logger.error("--map_automatic_fsm needs the corrected isoforms FASTA file (--corrected_isoforms_fasta).")
         sys.exit(1)

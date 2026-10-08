@@ -70,6 +70,8 @@ def write_filter_parameters(args):
       f.write("LogLevel\t" + str(args.log_level) + "\n")
       if args.subcommand == 'rules':
           f.write("JSON\t" + str(args.json_filter) + "\n")
+          f.write("PrevalenceModel\t" + str(args.prevalence_model) + "\n")
+          f.write("Alpha\t" + str(args.alpha) + "\n")
       if args.subcommand == 'ml':
           f.write("PercentTraining\t" + str(args.percent_training) + "\n")
           f.write("TP\t" + (str(args.TP) if args.TP is not None else "NA") + "\n")
@@ -100,6 +102,7 @@ def write_rescue_parameters(args):
         f.write("Strategy\t" + str(args.strategy) + "\n")
         f.write("CountsDesign\t" + (os.path.abspath(args.counts_design) if args.counts_design is not None else "NA") + "\n")
         f.write("MinExpression\t" + str(args.min_expression) + "\n")
+        f.write("PrevalenceThresholds\t" + str(args.prevalence_thresholds) + "\n")
         f.write("SkipEvidenceCheck\t" + str(args.skip_evidence_check) + "\n")
         f.write("MapAutomaticFSM\t" + str(args.map_automatic_fsm) + "\n")
         f.write("SkipReport\t" + str(args.skip_report) + "\n")

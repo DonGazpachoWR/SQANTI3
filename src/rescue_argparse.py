@@ -75,6 +75,10 @@ def rescue_argparse():
                     \nUsed by the evidence check to compute prevalence and prevalence_<group> on the counts \
                     \nthat rescued reference transcripts receive from their artifacts. \
                     \nDefault: %(default)s")
+  rf.add_argument("--prevalence_thresholds",
+                  help = "Minimum prevalence computed by the SQANTI3 rules filter for the requisites set to \"auto\" \
+                    \n(<prefix>_prevalence_thresholds.tsv), so that the evidence check applies the same thresholds. \
+                    \nDefault: the file of the filter next to --filter_class.")
   rf.add_argument("--skip_evidence_check", action="store_true",
                   help = "Do not apply the requisites on long-read counts (FL, prevalence, prevalence_<group>) \
                     \nto the rescued reference transcripts (behaviour of previous versions).")

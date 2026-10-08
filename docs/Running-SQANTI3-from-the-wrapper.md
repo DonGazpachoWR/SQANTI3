@@ -127,6 +127,8 @@ filter:
       enabled: true
       options:
         json_filter: <path_to>/SQANTI3/src/utilities/filter/filter_default.json
+        prevalence_model: ''
+        alpha: 0.01
     ml:
       enabled: false
       options:
@@ -154,6 +156,7 @@ rescue:
     json_filter: <path_to>/SQANTI3/src/utilities/filter/filter_default.json
     counts_design: ''
     min_expression: 0
+    prevalence_thresholds: ''
     skip_evidence_check: false
     map_automatic_fsm: false
     random_forest: sqanti3_results/isoformsrandomforest.RData

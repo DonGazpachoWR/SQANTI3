@@ -18,6 +18,10 @@ RESCUE_IGNORED_RULES = ["FL", "prevalence", "subcategory"]
 # the fractional counts of quantifiers such as bambu are kept. Used by QC for the
 # prevalence and prevalence_<group> columns.
 MIN_EXPRESSION = 0.0
+# Default of --alpha of the rules filter: tolerated false positive rate per transcript
+# of the prevalence requisites set to "auto" (see utilities/prevalence_model.py). With
+# around 100,000 transcripts, 0.01 still lets about 1,000 noise transcripts through.
+PREVALENCE_ALPHA = 0.01
 
 FIELDS_JUNC = ['isoform', 'chrom', 'strand', 'junction_number', 'genomic_start_coord',
                    'genomic_end_coord', 'transcript_coord', 'junction_category',

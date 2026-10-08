@@ -9,6 +9,7 @@ from src.utilities.indels_annot import calc_indels_from_sam
 from src.qc_output import (
     cleanup, generate_report, generate_tusco_report, save_isoforms_info,
     write_classification_output, write_isoform_hits, write_junction_output,
+    write_prevalence_model,
     write_omitted_isoforms, write_collapsed_GFF_with_CDS
 )
 from src.helpers import (
@@ -157,6 +158,7 @@ def run(args):
 
         # Write final classification
         write_classification_output(isoforms_info, outputClassPath)
+        write_prevalence_model(isoforms_info, outputClassPath)
 
         # Now that RTS info is obtained, we can write the final junctions.txt
         write_junction_output(outputJuncPath, RTS_info, fields_junc_cur)

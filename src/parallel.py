@@ -13,7 +13,7 @@ from src.qc_computations import classify_fsm, full_length_quantification, proces
 from src.qc_pipeline import run
 from src.helpers import get_corr_filenames, get_class_junc_filenames, get_isoform_hits_name, get_pickle_filename, rename_novel_genes
 from src.qc_output import (
-    cleanup, generate_report, generate_tusco_report, write_classification_output, write_isoform_hits, write_junction_output, write_omitted_isoforms, write_collapsed_GFF_with_CDS)
+    cleanup, generate_report, generate_tusco_report, write_classification_output, write_prevalence_model, write_isoform_hits, write_junction_output, write_omitted_isoforms, write_collapsed_GFF_with_CDS)
 from src.module_logging import qc_logger
 
 # TODO: Create a special logging for the parallelization, to handle the individual logs of the splits into  their own files
@@ -229,6 +229,7 @@ def combine_split_runs(args, split_dirs):
     if args.include_ORF:
         write_collapsed_GFF_with_CDS(isoforms_info, corrGTF, corrCDS_GTF_GFF)
     write_classification_output(isoforms_info, outputClassPath)
+    write_prevalence_model(isoforms_info, outputClassPath)
     write_junction_output(outputJuncPath, RTS_info, fields_junc_cur)
     #write omitted isoforms if requested minimum reference length is more than 0
     isoforms_info = write_omitted_isoforms(isoforms_info, args.dir, args.output,

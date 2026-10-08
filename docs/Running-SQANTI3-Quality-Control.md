@@ -418,6 +418,20 @@ For each group, QC adds a `prevalence_<group>` column to the classification file
 
 Sample names must match the header of the `--fl_count` file, and each sample can belong to a single group. Group names can only contain letters, digits, `_` and `.`, since they become part of a column name. Samples of the `--fl_count` file that are not listed in the design (for instance, mixtures used as a response variable) still count for `prevalence` but for no group; a warning lists them. Transcripts missing from the `--fl_count` file get `NA` in every prevalence column.
 
+### Prevalence model
+
+With a multi-sample `--fl_count` file, QC also writes `<prefix>_prevalence_model.tsv`, next to the classification file. It describes how often technical noise is detected: the number of samples in which a transcript is expressed is modelled as a mixture of two binomials, noise transcripts being expressed in each sample with probability `epsilon` and real transcripts with probability `p`. QC estimates both, and the fraction of noise transcripts (`noise_fraction`), by maximum likelihood (EM). Transcripts not expressed in any of the samples of a column are left out of its estimate, and the likelihood accounts for them (zero-truncated), so that the estimates do not depend on whether the quantifier reports transcripts without counts. `epsilon` is a property of the quantification and differs widely between tools, which makes it useful to compare them. The [rules filter](Running-SQANTI3-filter.md#optimal-minimum-prevalence-auto) uses the model for the prevalence requisites set to `"auto"`.
+
+The file has one row for `prevalence` and, with `--counts_design`, one row per `prevalence_<group>` column, with:
+
+* `column`, `samples`: the prevalence column and its number of samples.
+* `min_expression`: the `--min_expression` value, which defines expression.
+* `transcripts`, `excluded`: transcripts expressed in at least one of the samples of the column (of any group for `prevalence_<group>`), used for the estimate, and transcripts expressed in none of them.
+* `noise_fraction`, `epsilon`, `p`, `status`: the estimate used by the filter. For `prevalence_<group>` it is common to all groups, each group with its own number of samples.
+* `noise_fraction_group`, `epsilon_group`, `p_group`, `status_group`: the estimate of each group alone (`NA` for `prevalence`).
+
+`status` is `fitted`, or explains why there is no estimate: `too_few_transcripts` (fewer than 100), `not_identifiable` (too few samples: a single column needs at least 4) or `not_converged`. The `prevalence` row treats all samples as replicates of a single condition, so with several conditions the per-group estimate is the one to use.
+
 When plotted, the script [SQANTI3_report.R](https://github.com/ConesaLab/SQANTI3/blob/tree/master/utilities/SQANTI3_report.R) will convert the FL counts to TPM using the formula:
 
 ```

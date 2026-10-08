@@ -428,6 +428,31 @@ class TestOrchestration:
         assert isinstance(rescue_df, pd.DataFrame)
         assert inclusion_list.to_frame(name="isoform")["isoform"].tolist() == ["REF1"]
 
+    def test_run_evidence_check_takes_auto_from_the_filter(self, design_file, tmp_path):
+        rules = tmp_path / "auto.json"
+        rules.write_text(json.dumps({"full-splice_match": [{"prevalence_K": "auto"}], "rest": []}))
+        thresholds = tmp_path / "iso_prevalence_thresholds.tsv"
+        pd.DataFrame({"column": ["prevalence_K"], "min_prevalence": [3]}).to_csv(
+            thresholds, sep="\t", index=False)
+        c = classif({"a1": ("Artifact", {"K1": 5, "K2": 5})})
+        r = rescue_table([("a1", "REF1", "automatic", "reference", "yes")])
+        inc, df = run_evidence_check(c, r, pd.Series(["REF1"]), hits([]), str(rules), design_file,
+                                     counts_file(tmp_path, c), str(tmp_path), 0, str(thresholds))
+        # Detected in 2 samples of K, below the threshold of the filter
+        assert df["evidence_check"].tolist() == ["failed"]
+        written = json.loads((tmp_path / "evidence_check_rules.json").read_text())
+        assert written == {"full-splice_match": [{"prevalence_K": 3}]}
+
+    def test_run_evidence_check_auto_without_thresholds_exits(self, design_file, tmp_path):
+        rules = tmp_path / "auto.json"
+        rules.write_text(json.dumps({"full-splice_match": [{"prevalence_K": "auto"}], "rest": []}))
+        c = classif({"a1": ("Artifact", {"K1": 5})})
+        r = rescue_table([("a1", "REF1", "automatic", "reference", "yes")])
+        with pytest.raises(SystemExit):
+            run_evidence_check(c, r, pd.Series(["REF1"]), hits([]), str(rules), design_file,
+                               counts_file(tmp_path, c), str(tmp_path), 0,
+                               str(tmp_path / "missing.tsv"))
+
     def test_fallback_mapping_without_automatic_rows(self, tmp_path):
         r = rescue_table([("a1", "REF1", "rules_mapping", "reference", "yes")])
         out = run_fallback_mapping(classif({}), r, None, None, None, str(tmp_path), "x")

@@ -5,7 +5,10 @@ from src.commands import GFFREAD_PROG, run_command
 from src.helpers import find_isoform_id_collisions
 from src.module_logging import qc_logger, filter_logger, rescue_logger
 from src.parsers import read_counts_design, check_counts_design, count_file_samples
-from src.utilities.rescue.evidence_check import target_count_rules, check_design_for_rules
+from src.utilities.rescue.evidence_check import TARGET_CATEGORY, target_count_rules, check_design_for_rules
+from src.utilities.prevalence_model import (
+    model_path, thresholds_path, auto_columns, read_min_prevalence, resolve_auto
+)
 
 def valid_file(filename,logger):
     if not os.path.isfile(filename):
@@ -275,6 +278,11 @@ def filter_args_validation(args):
         args.filter_gtf = valid_gtf(args.filter_gtf, filter_logger, args.dir)
     if args.subcommand == 'rules':
         valid_file(args.json_filter, filter_logger)
+        if not 0 < args.alpha < 1:
+            filter_logger.error(f"--alpha must be between 0 and 1, instead given {args.alpha}.")
+            sys.exit(1)
+        if args.prevalence_model is None:
+            args.prevalence_model = model_path(args.sqanti_class)
     if args.subcommand == 'ml':
         if args.TP is not None:
             valid_file(args.TP, filter_logger)
@@ -329,6 +337,8 @@ def rescue_args_validation(args):
             valid_file(args.random_forest,rescue_logger)
     if args.counts_design is not None:
         valid_file(args.counts_design, rescue_logger)
+    if args.prevalence_thresholds is None:
+        args.prevalence_thresholds = thresholds_path(args.filter_class)
     if args.map_automatic_fsm and args.corrected_isoforms_fasta is None:
         rescue_logger.error("--map_automatic_fsm needs the corrected isoforms FASTA file (--corrected_isoforms_fasta).")
         sys.exit(1)
@@ -364,4 +374,17 @@ def rescue_args_validation(args):
             sys.exit(1)
         if evidence_check:
             check_design_for_rules(rule_sets, design)
+            # Prevalence requisites set to "auto" take the minimum prevalence computed by the rules filter
+            columns = auto_columns({TARGET_CATEGORY: rule_sets})
+            if columns and not os.path.isfile(args.prevalence_thresholds):
+                rescue_logger.error(f"The rules set {columns} to \"auto\": the evidence check needs the minimum "
+                                    "prevalence computed by the rules filter (<prefix>_prevalence_thresholds.tsv), "
+                                    f"but {args.prevalence_thresholds} was not found. Provide it with --prevalence_thresholds.")
+                sys.exit(1)
+            if columns:
+                try:
+                    resolve_auto({TARGET_CATEGORY: rule_sets}, read_min_prevalence(args.prevalence_thresholds))
+                except ValueError as e:
+                    rescue_logger.error(str(e))
+                    sys.exit(1)
     return evidence_check

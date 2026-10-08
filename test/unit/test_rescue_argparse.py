@@ -52,6 +52,7 @@ def _rescue_namespace(**overrides):
         json_filter="filter.json",
         counts_design=None,
         min_expression=0.0,
+        prevalence_thresholds=None,
         map_automatic_fsm=False,
         random_forest="rf.RData",
         threshold=0.7,
@@ -218,3 +219,26 @@ class TestEvidenceCheckValidation:
         counts, design = self.files(tmp_path, ["K1", "K2"], {"K": ["K1", "K9"]})
         with pytest.raises(SystemExit):
             au.rescue_args_validation(self.args(json_file, counts=counts, counts_design=design))
+
+    def test_auto_with_thresholds(self, tmp_path):
+        p = tmp_path / "auto.json"
+        p.write_text(json.dumps({"full-splice_match": [{"prevalence": "auto"}]}))
+        thresholds = tmp_path / "thresholds.tsv"
+        thresholds.write_text("column\tmin_prevalence\nprevalence\t3\n")
+        args = self.args(str(p), prevalence_thresholds=str(thresholds))
+        assert au.rescue_args_validation(args) is True
+
+    def test_auto_without_thresholds_exit(self, tmp_path):
+        """Checked at validation, before mapping, instead of in the evidence check step."""
+        p = tmp_path / "auto.json"
+        p.write_text(json.dumps({"full-splice_match": [{"prevalence": "auto"}]}))
+        with pytest.raises(SystemExit):
+            au.rescue_args_validation(self.args(str(p), prevalence_thresholds=str(tmp_path / "missing.tsv")))
+
+    def test_auto_missing_from_thresholds_exit(self, tmp_path):
+        p = tmp_path / "auto.json"
+        p.write_text(json.dumps({"full-splice_match": [{"prevalence": "auto"}]}))
+        thresholds = tmp_path / "thresholds.tsv"
+        thresholds.write_text("column\tmin_prevalence\nprevalence_K\t3\n")
+        with pytest.raises(SystemExit):
+            au.rescue_args_validation(self.args(str(p), prevalence_thresholds=str(thresholds)))

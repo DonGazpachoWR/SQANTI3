@@ -142,6 +142,8 @@ The requisites on long-read counts (`FL`, `FL.<sample>`, `prevalence` and `preva
 
 Rules on `prevalence_<group>` need the experimental design: provide the same `--counts_design` file given to SQANTI3 QC. Samples outside the design (e.g. mixtures) count for the global `prevalence` but not for any group.
 
+Prevalence requisites set to [`"auto"`](Running-SQANTI3-filter.md#optimal-minimum-prevalence-auto) take the thresholds that the rules filter computed for the long-read transcriptome, from its `<prefix>_prevalence_thresholds.tsv` file: by default the one next to `--filter_class`, or the file given with `--prevalence_thresholds`. Reference targets are thus held to the same number of samples as long-read isoforms, and `evidence_check_rules.json` shows the numbers that were applied.
+
 Reference transcripts that fail are not reintroduced. Each of their rescue-by-mapping artifacts that is left without a passing target is reassigned to its best mapping hit among the long read-defined isoforms that passed the filter. FSM artifacts of automatic rescue are not mapped: they share all their junctions with the failed reference transcript, so any long read-defined isoform would contradict them. Artifacts without such a hit are left unrescued, and requantification sends their counts to the gene residual. The check needs `--counts`; it is skipped with `--skip_evidence_check`, and has no effect when the rules have no requisites on long-read counts.
 
 <img src = "https://raw.githubusercontent.com/aarzalluz/figures_public/master/SQANTI3/SQ3_rescue_04-rescue.png" height = "497" width = "798">
@@ -191,7 +193,7 @@ All in all, these are the arguments accepted by `sqanti3_rescue.py rules`:
 
 ```bash
 usage: sqanti3_rescue.py [-h] --filter_class FILTER_CLASS -rg REFGTF -rf REFFASTA [--corrected_isoforms_fasta CORRECTED_ISOFORMS_FASTA] [--filtered_isoforms_gtf FILTERED_ISOFORMS_GTF] [-k REFCLASSIF] [--counts COUNTS]
-                         [--counts_design COUNTS_DESIGN] [-e {all,fsm,none}] [--mode {automatic,full}] [--skip_requant] [--min_expression MIN_EXPRESSION] [-s {rules,ml}] [-j JSON_FILTER] [--skip_evidence_check]
+                         [--counts_design COUNTS_DESIGN] [-e {all,fsm,none}] [--mode {automatic,full}] [--skip_requant] [--min_expression MIN_EXPRESSION] [-s {rules,ml}] [-j JSON_FILTER] [--prevalence_thresholds PREVALENCE_THRESHOLDS] [--skip_evidence_check]
                          [-r RANDOM_FOREST] [-t THRESHOLD] [-o OUTPUT] [-d DIR] [--skip_report] [-c CPUS] [-v] [-l {ERROR,WARNING,INFO,DEBUG}]
 
 ```
@@ -241,6 +243,8 @@ Customization options:
 Rules specific options:
   -j JSON_FILTER, --json_filter JSON_FILTER
                         Full path to the JSON file including the rules used when running the SQANTI3 rules filter. Default: /home/pabloati/Programs/sqanti3/src/utilities/filter/filter_default.json
+  --prevalence_thresholds PREVALENCE_THRESHOLDS
+                        Minimum prevalence computed by the SQANTI3 rules filter for the requisites set to "auto" (<prefix>_prevalence_thresholds.tsv), so that the evidence check applies the same thresholds. Default: the file of the filter next to --filter_class.
   --skip_evidence_check
                         Do not apply the requisites on long-read counts (FL, prevalence, prevalence_<group>) to the rescued reference transcripts (behaviour of previous versions).
 

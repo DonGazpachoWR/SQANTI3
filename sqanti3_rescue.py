@@ -73,7 +73,8 @@ def main():
       hits_df = pd.read_csv(f"{prefix}_rescue_mapping_hits.tsv",sep="\t")
     else:
       hits_df = run_candidate_mapping(ref_trans_fasta,targets,candidates,
-                           args.corrected_isoforms_fasta,args.dir,args.output)
+                           args.corrected_isoforms_fasta,args.dir,args.output,
+                           args.cpus)
 
     #### RUN ML FILTER RESCUE ####
     # this part combines reference ML filter run with mapping results

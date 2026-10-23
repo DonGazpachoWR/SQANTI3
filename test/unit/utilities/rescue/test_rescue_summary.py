@@ -230,3 +230,25 @@ def test_hit_targets_table_without_reference_artifacts(tmp_path, classif):
                             "alignment_type": [0], "alignment_score": [10]})
     out = hit_targets_table(hits_df, classif, str(ref), "rules", reasons_file=str(reasons))
     assert out["hit_filter_reason"].isna().all()
+
+def test_evidence_check_failed_targets_are_not_rescued(classif):
+    # REF3 failed the evidence check; nic_ref has no other target, nnc_lr was reassigned
+    rescue_df = pd.DataFrame([
+        ("fsm_art_lost", "R2", "automatic", "reference", "yes", "pass"),
+        ("nic_ref", "R3", "rules_mapping", "reference", "no", "failed"),
+        ("nnc_lr", "R3", "rules_mapping", "reference", "no", "failed"),
+        ("nnc_lr", "lr_target", "rules_mapping", "lr_defined", "no", "reassigned"),
+    ], columns=["artifact", "assigned_transcript", "rescue_mode", "origin", "reintroduced",
+                "evidence_check"])
+    summary, outcomes = summarize_rescue(classif, rescue_df, ["R2"], "full", "rules", "all",
+                                         CANDIDATES, None)
+    got = dict(zip(outcomes.artifact, outcomes.outcome))
+    assert got["nic_ref"] == "failed_evidence_check"
+    assert got["nnc_lr"] == "rescued_lr_defined"
+    assert get(summary, "evidence_check", "reference_targets", "failed") == 1
+    assert get(summary, "evidence_check", "reference_targets", "pass") == 1
+    assert get(summary, "evidence_check", "artifacts_of_failed_targets", "reassigned_to_lr_defined") == 1
+    assert get(summary, "evidence_check", "artifacts_of_failed_targets", "sent_to_gene_residual") == 1
+    # failed rows do not count as assignments
+    assert get(summary, "overview", "transcripts", "assigned_transcripts") == 2
+    assert get(summary, "overview", "artifacts", "rescued") == 2

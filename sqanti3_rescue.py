@@ -22,7 +22,7 @@ from src.rescue_steps import (
   run_automatic_rescue,
   rescue_candidates, rescue_targets,
   run_candidate_mapping, run_rules_rescue, run_ML_rescue,
-  save_rescue_results,
+  save_rescue_results, run_rescue_report,
   run_fallback_mapping, run_evidence_check
 )
 from src.utilities.rescue.candidate_mapping_helpers import prepare_fasta_transcriptome
@@ -123,6 +123,9 @@ def main():
     rescue_class = save_rescue_results(args.dir, args.output, inclusion_list, rescue_df,
                                        args.refGTF, args.filtered_isoforms_gtf,args.corrected_isoforms_fasta,
                                        class_df,args.refClassif)
+
+  #### SUMMARY AND REPORT ####
+  run_rescue_report(class_df, rescue_df, inclusion_list, args, candidates, hits_df)
 
   ## END ##
  

@@ -1,5 +1,5 @@
 import argparse
-from src.config import __version__,__author__, default_json
+from src.config import __version__,__author__, default_json, PREVALENCE_ALPHA
 
 def filter_argparse():
 
@@ -44,6 +44,13 @@ def filter_argparse():
     rf = rules.add_argument_group("Rules specific options")
     rf.add_argument('-j', "--json_filter", default=default_json, 
                     help="JSON file where filtering rules are expressed. Rules must be set taking into account that attributes described in the filter will be present in those isoforms that should be kept."
+                        "\nDefault: %(default)s")
+    rf.add_argument("--prevalence_model",
+                    help="Prevalence model written by SQANTI3 QC (<prefix>_prevalence_model.tsv), used for the prevalence requisites set to \"auto\" in the rules."
+                        "\nDefault: the file of QC next to --sqanti_class.")
+    rf.add_argument("--alpha", type=float, default=PREVALENCE_ALPHA,
+                    help="Tolerated false positive rate per transcript of the prevalence requisites set to \"auto\": they require the smallest number of samples"
+                        "\nin which a noise transcript is expressed with a probability not above alpha (corrected by the number of groups for prevalence_<group>)."
                         "\nDefault: %(default)s")
 
 ### ML filter arguments

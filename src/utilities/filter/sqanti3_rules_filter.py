@@ -1,6 +1,10 @@
 import os, sys, json
 import pandas as pd
+from src.config import PREVALENCE_ALPHA
 from src.module_logging import message,filter_logger
+from src.utilities.prevalence_model import (
+    auto_columns, prevalence_thresholds, resolve_auto, thresholds_path
+)
 
 junction_related_columns = [
     "RTS_stage",
@@ -14,7 +18,7 @@ junction_related_columns = [
     "predicted_NMD"
 ]
 
-def read_json_rules(json_file):
+def read_json_rules(json_file, min_prevalence=None):
     """Parse JSON rules file into structured DataFrame format for filtering.
     
     Processes JSON rules containing filtering criteria for different structural
@@ -23,6 +27,8 @@ def read_json_rules(json_file):
     Args:
         json_file (str): Path to JSON file containing filtering rules. JSON structure should
             have structural categories as keys with lists of rule dictionaries.
+        min_prevalence (dict): column -> minimum number of samples, which replaces
+            the prevalence requisites set to "auto" (see prevalence_thresholds()).
             
     Returns:
         dict: Nested dictionary where keys are structural categories, and values are lists
@@ -37,6 +43,11 @@ def read_json_rules(json_file):
         json_data = json.load(f)
 
     names_check(json_data,)
+    try:
+        json_data = resolve_auto(json_data, min_prevalence)
+    except ValueError as e:
+        filter_logger.error(str(e))
+        sys.exit(1)
 
     rules_dict = {} 
     for sc, rules in json_data.items():
@@ -213,7 +224,54 @@ def get_reasons(row, force_multiexon, rules_dict):
         'filter_reason': '; '.join(reasons)
     })
 
-def rules_filter(sqanti_class,json_file,force_multi_exon,prefix,logger):
+def optimal_prevalence(json_file, prevalence_model, alpha, logger):
+    """Minimum prevalence of the requisites set to "auto" in the rules.
+
+    Uses the prevalence model of QC (prevalence_model.py): each threshold is the
+    smallest number of samples where a noise transcript is expressed with a
+    probability not above alpha, corrected by the number of groups for
+    prevalence_<group>.
+
+    Args:
+        json_file (str): Path to JSON file containing filtering rules
+        prevalence_model (str): Prevalence model written by QC
+        alpha (float): Tolerated false positive rate per transcript
+        logger (logging.Logger): Configured logger for progress reporting
+
+    Returns:
+        pd.DataFrame: one row per "auto" column (see prevalence_thresholds()),
+        or None if no rule uses "auto"
+
+    Exits:
+        Calls sys.exit(1) if the model is missing or cannot give a threshold.
+    """
+    with open(json_file, 'r') as f:
+        columns = auto_columns(json.load(f))
+    thresholds = None
+    if columns:
+        message("Computing the optimal minimum prevalence",logger)
+        if prevalence_model is None or not os.path.isfile(prevalence_model):
+            logger.error(f"The rules set {columns} to \"auto\": the prevalence model of SQANTI3 QC "
+                         f"(<prefix>_prevalence_model.tsv) is needed, but {prevalence_model} was not found. "
+                         "Provide it with --prevalence_model.")
+            sys.exit(1)
+        try:
+            thresholds = prevalence_thresholds(pd.read_csv(prevalence_model, sep="\t"), columns, alpha)
+        except ValueError as e:
+            logger.error(str(e))
+            sys.exit(1)
+        for row in thresholds.itertuples():
+            logger.info(f"{row.column}: {row.samples} samples, epsilon = {row.epsilon:.4g}, "
+                        f"alpha = {row.alpha_column:.4g} -> at least {row.min_prevalence} samples "
+                        f"(false positive rate {row.fpr:.3g}, power {row.power:.3g})")
+            if not row.controlled:
+                logger.warning(f"{row.column}: no number of samples keeps the false positive rate "
+                               f"below {row.alpha_column:.4g}; all {row.samples} samples are required "
+                               f"(false positive rate {row.fpr:.3g}, power {row.power:.3g}).")
+    return thresholds
+
+def rules_filter(sqanti_class,json_file,force_multi_exon,prefix,logger,
+                 prevalence_model=None,alpha=PREVALENCE_ALPHA):
     """Main function to execute SQANTI3 filtering workflow.
     
     Args:
@@ -222,12 +280,17 @@ def rules_filter(sqanti_class,json_file,force_multi_exon,prefix,logger):
         force_multi_exon (bool): If True, exclude all mono-exonic transcripts
         prefix (str): Output filename prefix
         logger (logging.Logger): Configured logger for progress reporting
+        prevalence_model (str): Prevalence model of QC, needed if the rules set
+            prevalence requisites to "auto"
+        alpha (float): Tolerated false positive rate of those requisites
         
     Output Files:
-        Creates three files in current directory:
+        Creates these files in current directory:
         - {prefix}_RulesFilter_classification.txt: Full classification with filter results
         - {prefix}_pass_isoforms.txt: List of passing isoforms
         - {prefix}_filtering_reasons.txt: Detailed filtering reasons for artifacts
+        - {prefix}_prevalence_thresholds.tsv: Minimum prevalence computed for the
+          requisites set to "auto", if any
         
     Example:
         >>> rules_filter("input.tsv", "rules.json", True, "output", logger)
@@ -237,8 +300,12 @@ def rules_filter(sqanti_class,json_file,force_multi_exon,prefix,logger):
     classif = pd.read_csv(sqanti_class, sep="\t", dtype={'chrom': str})
 
     message("Reading JSON rules",logger)
-    
-    rules_dict = read_json_rules(json_file)
+
+    thresholds = optimal_prevalence(json_file, prevalence_model, alpha, logger)
+    min_prevalence = None
+    if thresholds is not None:
+        min_prevalence = dict(zip(thresholds["column"], thresholds["min_prevalence"]))
+    rules_dict = read_json_rules(json_file, min_prevalence)
 
     message("Applying rules to filter isoforms",logger)
 
@@ -253,4 +320,10 @@ def rules_filter(sqanti_class,json_file,force_multi_exon,prefix,logger):
     classif.to_csv(os.path.join(f"{prefix}_RulesFilter_classification.txt"), sep='\t', index=False)
     inclusion_list.to_csv(os.path.join(f"{prefix}_pass_isoforms.txt"), sep='\t', index=False, header=False)
     reasons_df.to_csv(os.path.join(f"{prefix}_filtering_reasons.txt"), sep='\t', index=False)
+    if thresholds is not None:
+        # Isoforms that reach each threshold, whatever the rest of their rules
+        thresholds["isoforms_passing"] = [int((classif[c] >= m).sum()) for c, m in
+                                          zip(thresholds["column"], thresholds["min_prevalence"])]
+        thresholds.to_csv(thresholds_path(f"{prefix}_RulesFilter_classification.txt"),
+                          sep='\t', index=False)
 

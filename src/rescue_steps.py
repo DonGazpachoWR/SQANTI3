@@ -34,10 +34,11 @@ from src.rescue_output import (
 
 from src.parsers import read_counts_design
 from src.utilities.rescue.evidence_check import (
-    rule_column_matches, target_count_rules, count_samples,
+    TARGET_CATEGORY, rule_column_matches, target_count_rules, count_samples,
     write_evidence_rules, apply_evidence_check
 )
 from src.utilities.rescue.sq_requant import load_counts
+from src.utilities.prevalence_model import auto_columns, read_min_prevalence, resolve_auto
 
 MINIMAP2_RESCUE_OPTS = "--secondary=yes -ax map-hifi"
 # Rules removed from the JSON file before filtering the reference transcriptome,
@@ -316,17 +317,25 @@ def run_fallback_mapping(classif_df, rescue_df, ref_trans_fasta, ref_gtf,
 
 
 def run_evidence_check(classif_df, rescue_df, inclusion_list, hits_df, json_filter,
-                       counts_design, counts_file, out_dir, min_expression):
+                       counts_design, counts_file, out_dir, min_expression,
+                       prevalence_thresholds=None):
     """Apply the count requisites of the rules to the rescued reference targets.
 
     The requisites are written to {out_dir}/evidence_check_rules.json and
     evaluated by the rules filter on the counts that requantification would give
     each target from the --counts file, with the expression threshold of QC
-    (min_expression).
+    (min_expression). Prevalence requisites set to "auto" take the minimum
+    prevalence computed by the rules filter (prevalence_thresholds file).
     """
     message("Evidence check of rescued reference transcripts", rescue_logger)
     with open(json_filter) as f:
         rule_sets = target_count_rules(json.load(f))
+    # The thresholds file was checked by rescue_args_validation
+    columns = auto_columns({TARGET_CATEGORY: rule_sets})
+    if columns:
+        rule_sets = resolve_auto({TARGET_CATEGORY: rule_sets},
+                                 read_min_prevalence(prevalence_thresholds))[TARGET_CATEGORY]
+        rescue_logger.info(f"Minimum prevalence of {columns} taken from {prevalence_thresholds}")
     counts_df = load_counts(counts_file, classif_df)
     # The design and the rules were checked against --counts by rescue_args_validation;
     # with a single sample the design is ignored

@@ -126,7 +126,7 @@ def test_filter_args_validation_uses_converted_gtf(tmp_path):
     out_dir = tmp_path / "out"
     args = Namespace(sqanti_class=str(classification), filter_isoforms=None, filter_gtf=str(gff),
                      filter_sam=None, filter_faa=None, dir=str(out_dir), subcommand="rules",
-                     json_filter=str(json_filter))
+                     json_filter=str(json_filter), alpha=0.01, prevalence_model=None)
     with mock.patch("src.argparse_utils.run_command", side_effect=fake_gffread()):
         filter_args_validation(args)
     assert args.filter_gtf == str(out_dir / "isoforms.converted.gtf")

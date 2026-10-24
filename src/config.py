@@ -6,6 +6,10 @@ __reads_version__ = '1.1.0'  # SQANTI-Reads version
 utilitiesPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "utilities")
 default_json = os.path.abspath(utilitiesPath + "/filter/filter_default.json")
 
+# Default of --alpha of the rules filter: tolerated false positive rate per transcript
+# of the prevalence requisites set to "auto" (see utilities/prevalence_model.py). With
+# around 100,000 transcripts, 0.01 still lets about 1,000 noise transcripts through.
+PREVALENCE_ALPHA = 0.01
 
 FIELDS_JUNC = ['isoform', 'chrom', 'strand', 'junction_number', 'genomic_start_coord',
                    'genomic_end_coord', 'transcript_coord', 'junction_category',

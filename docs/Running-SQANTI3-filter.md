@@ -52,6 +52,7 @@ These are the arguments accepted by `sqanti3_filter.py rules`:
 ```
 usage: sqanti3_filter.py rules [-h] --sqanti_class SQANTI_CLASS [--isoAnnotGFF3 ISOANNOTGFF3] [--filter_isoforms FILTER_ISOFORMS] [--filter_gtf FILTER_GTF] [--filter_sam FILTER_SAM]
                                [--filter_faa FILTER_FAA] [-o OUTPUT] [-d DIR] [--skip_report] [-e] [-v] [-c CPUS] [-l {ERROR,WARNING,INFO,DEBUG}] [-j JSON_FILTER]
+                               [--prevalence_model PREVALENCE_MODEL] [--alpha ALPHA]
 ```
 
 <details><summary> Arguments description</summary>
@@ -99,6 +100,12 @@ Rules specific options:
   -j JSON_FILTER, --json_filter JSON_FILTER
                         JSON file where filtering rules are expressed. Rules must be set taking into account that attributes described in the filter will be present in those isoforms that should be kept.
                         Default: <path_to>/SQANTI3/src/utilities/filter/filter_default.json
+  --prevalence_model PREVALENCE_MODEL
+                        Prevalence model written by SQANTI3 QC (<prefix>_prevalence_model.tsv), used for the prevalence requisites set to "auto" in the rules.
+                        Default: the file of QC next to --sqanti_class.
+  --alpha ALPHA         Tolerated false positive rate per transcript of the prevalence requisites set to "auto": they require the smallest number of samples
+                        in which a noise transcript is expressed with a probability not above alpha (corrected by the number of groups for prevalence_<group>).
+                        Default: 0.01
 ```
 </details><br>
 
@@ -171,6 +178,23 @@ Rules can be set for any numeric or character column in the classification file:
 - **Character and logical columns**: such as `subcategory`, `RTS_stage` or `all_canonical`. In this case, users can simply establish which terms will be accepted. Of note, users may want to accept several of the values in the column (for instance, several subcategories). If so, the requisite can be defined as an array, and the filter will keep the entries if any of those values are present in the specified column.
 
 Requisites on junction-related columns (`RTS_stage`, `all_canonical`, `min_cov`, `min_cov_pos`, `sd_cov`, `min_intron_length`, `n_indels_junc`, `bite` and `predicted_NMD`) are skipped for mono-exonic transcripts, since they have no junctions.
+
+#### Optimal minimum prevalence: `"auto"`
+
+Instead of a number, a `prevalence` or `prevalence_<group>` requisite can be set to `"auto"`. The filter then requires the smallest number of samples that keeps the false positive rate of that requisite at or below `--alpha` (0.01 by default):
+
+```json
+{
+    "novel_not_in_catalog":[
+        {"all_canonical":"canonical", "prevalence_K": "auto"},
+        {"all_canonical":"canonical", "prevalence_B": "auto"}
+    ]
+}
+```
+
+The threshold comes from the [prevalence model](Running-SQANTI3-Quality-Control.md#prevalence-model) that SQANTI3 QC writes to `<prefix>_prevalence_model.tsv`. Technical noise is expressed in each sample with a small probability ε and real isoforms with a higher probability p, so in a group of M samples the number of samples where a noise isoform is expressed follows a Binomial(M, ε). `"auto"` is the smallest m for which P(S >= m | noise) is not above alpha; it is also the threshold that keeps the most real isoforms among those that control the error, so it does not depend on p. Since requisites on different groups are usually combined with OR, for `prevalence_<group>` alpha is corrected by the number of groups G of the design, 1 - (1 - alpha)^(1/G). If not even all the samples of a group keep the rate below alpha, the filter requires all of them and reports it as a warning. Numbers and `"auto"` can be mixed in the same file.
+
+The filter reads the model next to `--sqanti_class`, or the file given with `--prevalence_model`. The thresholds are logged and written to `<prefix>_prevalence_thresholds.tsv` (see the [output](#rulesout)).
 
 #### User-defined rules (JSON file) example
 
@@ -253,6 +277,7 @@ The main SQANTI rules filter output files are:
     * (2) Structural Category
     * (3) Reason why the isoform was discarded as an artifact. If an isoform is catalogued as *Artifact* because it doesn't fulfill several rules, there will be multiple lines in this file regarding that isoform.
 * `*_SQANTI3_filter_report.pdf`: A PDF report with some plots describing the performance of the filtering.
+* `*_prevalence_thresholds.tsv`: Only when the rules set prevalence requisites to `"auto"`. One row per requisite with the number of samples of the column (`samples`), the `epsilon` and `p` of the model, `alpha` and the rate used for the column (`alpha_column`), the threshold (`min_prevalence`), the false positive rate (`fpr`) and power (`power`) it gives, whether the rate is below alpha (`controlled`) and the number of isoforms that reach it (`isoforms_passing`). SQANTI3 rescue reads it to apply the same thresholds.
 
 <a name="ml"></a>
 
